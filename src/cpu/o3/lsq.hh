@@ -69,7 +69,7 @@ class LSQ
     typedef typename Impl::DynInstPtr DynInstPtr;
     typedef typename Impl::CPUPol::IEW IEW;
     typedef typename Impl::CPUPol::LSQUnit LSQUnit;
-    std::map <Addr, RegVal> coalescing_buffer;
+    std::map <Addr, uint8_t *> coalescing_buffer;
     class LSQRequest;
     /** Derived class to hold any sender state the LSQ needs. */
     class LSQSenderState : public Packet::SenderState

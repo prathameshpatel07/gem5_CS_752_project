@@ -769,8 +769,11 @@ LSQ<Impl>::pushRequest(const DynInstPtr& inst, bool isLoad, uint8_t *data,
             }
        }
     }
-    else //Fetch data from coalescing buffer
+    else {//Fetch data from coalescing buffer
+       inst->memData = coalescing_buffer.at(inst->physEffAddr & mask) +
+       (inst->physEffAddr & ~mask);
        inst->setExecuted();
+    }
 
     if (inst->traceData)
         inst->traceData->setMem(addr, size, flags);
