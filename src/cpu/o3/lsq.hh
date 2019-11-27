@@ -69,7 +69,7 @@ class LSQ
     typedef typename Impl::DynInstPtr DynInstPtr;
     typedef typename Impl::CPUPol::IEW IEW;
     typedef typename Impl::CPUPol::LSQUnit LSQUnit;
-
+    std::map <Addr, RegVal> coalescing_buffer;
     class LSQRequest;
     /** Derived class to hold any sender state the LSQ needs. */
     class LSQSenderState : public Packet::SenderState
@@ -94,6 +94,7 @@ class LSQ
         PacketPtr pendingPacket;
         /** Number of outstanding packets to complete. */
         uint8_t outstanding;
+
         /** Whether or not it is a load. */
         bool isLoad;
         /** Whether or not the instruction will need to writeback. */

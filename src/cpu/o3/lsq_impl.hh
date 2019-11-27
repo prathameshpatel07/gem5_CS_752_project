@@ -51,6 +51,7 @@
 #include "base/logging.hh"
 #include "cpu/o3/cpu.hh"
 #include "cpu/o3/lsq.hh"
+#include "cpu/o3/lsq_unit.hh"
 #include "debug/Drain.hh"
 #include "debug/Fetch.hh"
 #include "debug/LSQ.hh"
@@ -732,34 +733,44 @@ LSQ<Impl>::pushRequest(const DynInstPtr& inst, bool isLoad, uint8_t *data,
 
         req->initiateTranslation();
     }
+    //Masking lower 6 bits as they determine offset inside the cache block
+    uint64_t mask = ~((1 << 6) - 1);
+    /*If data not found in coalescing buffer do the normal memory request*/
 
-    /* This is the place were instructions get the effAddr. */
-    if (req->isTranslationComplete()) {
-        if (req->isMemAccessRequired()) {
-            inst->effAddr = req->getVaddr();
-            inst->effSize = size;
-            inst->effAddrValid(true);
+    if (coalescing_buffer.find((inst->physEffAddr & mask))
+    == coalescing_buffer.end()) {
+       /* This is the place were instructions get the effAddr. */
+        if (req->isTranslationComplete()) {
+            if (req->isMemAccessRequired()) {
+                inst->effAddr = req->getVaddr();
+                inst->effSize = size;
+                inst->effAddrValid(true);
 
-            if (cpu->checker) {
-                inst->reqToVerify = std::make_shared<Request>(*req->request());
-            }
-            Fault fault;
-            if (isLoad)
-                fault = cpu->read(req, inst->lqIdx);
-            else
-                fault = cpu->write(req, data, inst->sqIdx);
+                if (cpu->checker) {
+                    inst->reqToVerify =
+                    std::make_shared<Request>(*req->request());
+                }
+                Fault fault;
+                if (isLoad)
+                    fault = cpu->read(req, inst->lqIdx);
+                else
+                    fault = cpu->write(req, data, inst->sqIdx);
             // inst->getFault() may have the first-fault of a
             // multi-access split request at this point.
             // Overwrite that only if we got another type of fault
             // (e.g. re-exec).
-            if (fault != NoFault)
-                inst->getFault() = fault;
-        } else if (isLoad) {
-            inst->setMemAccPredicate(false);
-            // Commit will have to clean up whatever happened.  Set this
-            // instruction as executed.
-            inst->setExecuted();
-        }
+                if (fault != NoFault)
+                    inst->getFault() = fault;
+               } else if (isLoad) {
+               inst->setMemAccPredicate(false);
+                // Commit will have to clean up whatever happened.  Set this
+                // instruction as executed.
+                inst->setExecuted();
+            }
+       }
+    }
+    else //Fetch data from coalescing buffer
+       inst->setExecuted();
     }
 
     if (inst->traceData)

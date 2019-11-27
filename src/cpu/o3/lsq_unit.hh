@@ -617,7 +617,6 @@ LSQUnit<Impl>::read(LSQRequest *req, int load_idx)
 
     load_req.setRequest(req);
     assert(load_inst);
-
     assert(!load_inst->isExecuted());
 
     // Make sure this isn't a strictly ordered load
@@ -751,7 +750,6 @@ LSQUnit<Impl>::read(LSQRequest *req, int load_idx)
 
                 WritebackEvent *wb = new WritebackEvent(load_inst, data_pkt,
                         this);
-
                 // We'll say this has a 1 cycle load-store forwarding latency
                 // for now.
                 // @todo: Need to make this a parameter.
