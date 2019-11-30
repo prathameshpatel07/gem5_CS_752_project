@@ -60,6 +60,7 @@
 #include "base/statistics.hh"
 #include "base/trace.hh"
 #include "base/types.hh"
+#include "cpu/o3/lsq.hh"
 #include "debug/Cache.hh"
 #include "debug/CachePort.hh"
 #include "enums/Clusivity.hh"

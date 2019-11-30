@@ -56,6 +56,7 @@
 #include "sim/sim_object.hh"
 
 struct DerivO3CPUParams;
+extern std::map <Addr, uint8_t *> coalescing_buffer;
 
 template <class Impl>
 class FullO3CPU;
@@ -69,7 +70,6 @@ class LSQ
     typedef typename Impl::DynInstPtr DynInstPtr;
     typedef typename Impl::CPUPol::IEW IEW;
     typedef typename Impl::CPUPol::LSQUnit LSQUnit;
-    std::map <Addr, uint8_t *> coalescing_buffer;
     class LSQRequest;
     /** Derived class to hold any sender state the LSQ needs. */
     class LSQSenderState : public Packet::SenderState

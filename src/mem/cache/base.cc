@@ -48,8 +48,11 @@
 
 #include "mem/cache/base.hh"
 
+#include <map>
+
 #include "base/compiler.hh"
 #include "base/logging.hh"
+#include "cpu/o3/lsq.hh"
 #include "debug/Cache.hh"
 #include "debug/CacheComp.hh"
 #include "debug/CachePort.hh"
@@ -65,6 +68,8 @@
 #include "sim/core.hh"
 
 using namespace std;
+
+map<Addr, uint8_t *> coalescing_buffer;
 
 BaseCache::CacheSlavePort::CacheSlavePort(const std::string &_name,
                                           BaseCache *_cache,
@@ -354,7 +359,6 @@ BaseCache::recvTimingReq(PacketPtr pkt)
         // happening below
         doWritebacks(writebacks, clockEdge(lat + forwardLatency));
     }
-
     // Here we charge the headerDelay that takes into account the latencies
     // of the bus, if the packet comes from it.
     // The latency charged is just the value set by the access() function.
@@ -949,6 +953,11 @@ BaseCache::satisfyRequest(PacketPtr pkt, CacheBlk *blk, bool, bool)
 
         // all read responses have a data payload
         assert(pkt->hasRespData());
+        if (pkt->cmd == MemCmd::ReadReq) {
+            uint8_t *d = (uint8_t *)malloc(64);
+            memcpy(d, blk->data, blkSize);
+            coalescing_buffer[pkt->getAddr()] = d;
+        }
         pkt->setDataFromBlock(blk->data, blkSize);
     } else if (pkt->isUpgrade()) {
         // sanity check
