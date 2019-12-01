@@ -956,7 +956,7 @@ BaseCache::satisfyRequest(PacketPtr pkt, CacheBlk *blk, bool, bool)
         //If read request from load copy the cache block to the buffer
         if (pkt->cmd == MemCmd::ReadReq) {
             uint8_t *d = (uint8_t *)malloc(64);
-            memcpy(d, blk->data, blkSize);
+            memcpy(d, blk->data, 64);
             uint64_t mask = ~((1 << 6) - 1);
             coalescing_buffer[(pkt->getAddr() & mask)] = d;
         }

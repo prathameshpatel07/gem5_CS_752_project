@@ -741,12 +741,16 @@ LSQ<Impl>::pushRequest(const DynInstPtr& inst, bool isLoad, uint8_t *data,
     if ((inst->isLoad() && coalescing_buffer.find(inst->physEffAddr & mask)
     == coalescing_buffer.end()) || !inst->isLoad()) {
        /* This is the place were instructions get the effAddr. */
+        if (inst->isStore()) {
+                if (coalescing_buffer.find(inst->physEffAddr & mask)
+                != coalescing_buffer.end())
+                        coalescing_buffer.erase(inst->physEffAddr & mask);
+        }
         if (req->isTranslationComplete()) {
             if (req->isMemAccessRequired()) {
                 inst->effAddr = req->getVaddr();
                 inst->effSize = size;
                 inst->effAddrValid(true);
-
                 if (cpu->checker) {
                     inst->reqToVerify =
                     std::make_shared<Request>(*req->request());
@@ -771,21 +775,40 @@ LSQ<Impl>::pushRequest(const DynInstPtr& inst, bool isLoad, uint8_t *data,
        }
     }
     else {//Fetch data from coalescing buffer
-       inst->effAddr = req->getVaddr();
-       inst->effSize = size;
-       inst->effAddrValid(true);
-       inst->memData = new uint8_t[size];
-       memcpy(inst->memData, coalescing_buffer.at(inst->physEffAddr & mask) +
-       (inst->physEffAddr & ~mask), size);
-       inst->setMemAccPredicate(true);
-       Fault fault;
-       fault = cpu->read_coalescing(req, inst->lqIdx);
+        if (req->isTranslationComplete()) {
+            if (req->isMemAccessRequired()) {
+                inst->effAddr = req->getVaddr();
+                inst->effSize = size;
+                inst->effAddrValid(true);
+
+                if (cpu->checker) {
+                    inst->reqToVerify =
+                    std::make_shared<Request>(*req->request());
+                }
+                Fault fault;
+                inst->memData = new uint8_t[size];
+                memcpy(inst->memData, coalescing_buffer.at(inst->physEffAddr
+                & mask) + (inst->physEffAddr & ~mask), size);
+                fault = cpu->read_coalescing(req, inst->lqIdx);
+                    inst->setExecuted();
+               }
+            }
+       }
+       //inst->effAddr = req->getVaddr();
+       //inst->effSize = size;
+       //inst->effAddrValid(true);
+       //inst->memData = new uint8_t[size];
+       //memcpy(inst->memData, coalescing_buffer.at(inst->physEffAddr & mask) +
+       //(inst->physEffAddr & ~mask), size);
+       //inst->setMemAccPredicate(false);
+       //Fault fault;
+       //fault = cpu->read(req, inst->lqIdx);
+
        //PacketPtr data_pkt = new Packet(req->mainRequest(), MemCmd::ReadReq);
        //data_pkt->dataStatic(inst->memData);
        //WritebackEvent *wb = new WritebackEvent(inst, data_pkt, this);
        //cpu->schedule(wb, curTick());
-       inst->setExecuted();
-    }
+       //inst->setExecuted();
 
     if (inst->traceData)
         inst->traceData->setMem(addr, size, flags);
