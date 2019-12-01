@@ -737,8 +737,8 @@ LSQ<Impl>::pushRequest(const DynInstPtr& inst, bool isLoad, uint8_t *data,
     uint64_t mask = ~((1 << 6) - 1);
     /*If data not found in coalescing buffer do the normal memory request*/
 
-    if (coalescing_buffer.find((inst->physEffAddr & mask))
-    == coalescing_buffer.end()) {
+    if ((inst->isLoad() && coalescing_buffer.find(inst->physEffAddr & mask)
+    == coalescing_buffer.end()) || !inst->isLoad()) {
        /* This is the place were instructions get the effAddr. */
         if (req->isTranslationComplete()) {
             if (req->isMemAccessRequired()) {
@@ -770,8 +770,12 @@ LSQ<Impl>::pushRequest(const DynInstPtr& inst, bool isLoad, uint8_t *data,
        }
     }
     else {//Fetch data from coalescing buffer
+       inst->effAddr = req->getVaddr();
+       inst->effSize = size;
+       inst->effAddrValid(true);
        inst->memData = coalescing_buffer.at(inst->physEffAddr & mask) +
        (inst->physEffAddr & ~mask);
+       inst->setMemAccPredicate(false);
        inst->setExecuted();
     }
 
