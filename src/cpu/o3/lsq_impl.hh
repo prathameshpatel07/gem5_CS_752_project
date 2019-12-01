@@ -775,7 +775,7 @@ LSQ<Impl>::pushRequest(const DynInstPtr& inst, bool isLoad, uint8_t *data,
        inst->effAddrValid(true);
        inst->memData = coalescing_buffer.at(inst->physEffAddr & mask) +
        (inst->physEffAddr & ~mask);
-       inst->setMemAccPredicate(false);
+       inst->setMemAccPredicate(true);
        inst->setExecuted();
     }
 
