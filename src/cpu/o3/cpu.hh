@@ -728,6 +728,11 @@ class FullO3CPU : public BaseO3CPU
         return this->iew.ldstQueue.read(req, load_idx);
     }
 
+    Fault read_coalescing(LSQRequest* req, int load_idx)
+    {
+        return this->iew.ldstQueue.read_coalescing(req, load_idx);
+    }
+
     /** CPU write function, forwards write to LSQ. */
     Fault write(LSQRequest* req, uint8_t *data, int store_idx)
     {

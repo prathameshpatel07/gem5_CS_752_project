@@ -957,7 +957,8 @@ BaseCache::satisfyRequest(PacketPtr pkt, CacheBlk *blk, bool, bool)
         if (pkt->cmd == MemCmd::ReadReq) {
             uint8_t *d = (uint8_t *)malloc(64);
             memcpy(d, blk->data, blkSize);
-            coalescing_buffer[pkt->getAddr()] = d;
+            uint64_t mask = ~((1 << 6) - 1);
+            coalescing_buffer[(pkt->getAddr() & mask)] = d;
         }
         pkt->setDataFromBlock(blk->data, blkSize);
     } else if (pkt->isUpgrade()) {

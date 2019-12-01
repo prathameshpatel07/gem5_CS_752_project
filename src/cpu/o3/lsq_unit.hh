@@ -573,6 +573,7 @@ class LSQUnit
     /** Executes the load at the given index. */
     Fault read(LSQRequest *req, int load_idx);
 
+    Fault read_coalescing(LSQRequest *req, int load_idx);
     /** Executes the store at the given index. */
     Fault write(LSQRequest *req, uint8_t *data, int store_idx);
 
@@ -607,6 +608,19 @@ class LSQUnit
     typedef CircularQueue<LQEntry> LQueue;
     typedef CircularQueue<SQEntry> SQueue;
 };
+
+template<class Impl>
+Fault
+LSQUnit<Impl>::read_coalescing(LSQRequest *req, int load_idx)
+{
+    LQEntry& load_req = loadQueue[load_idx];
+    const DynInstPtr& load_inst = load_req.instruction();
+    PacketPtr data_pkt = new Packet(req->mainRequest(), MemCmd::ReadReq);
+    data_pkt->dataStatic(load_inst->memData);
+    WritebackEvent *wb = new WritebackEvent(load_inst, data_pkt, this);
+    cpu->schedule(wb, curTick());
+    return NoFault;
+}
 
 template <class Impl>
 Fault

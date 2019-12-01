@@ -52,6 +52,7 @@
 #include "cpu/o3/cpu.hh"
 #include "cpu/o3/lsq.hh"
 #include "cpu/o3/lsq_unit.hh"
+#include "cpu/o3/lsq_unit_impl.hh"
 #include "debug/Drain.hh"
 #include "debug/Fetch.hh"
 #include "debug/LSQ.hh"
@@ -773,9 +774,16 @@ LSQ<Impl>::pushRequest(const DynInstPtr& inst, bool isLoad, uint8_t *data,
        inst->effAddr = req->getVaddr();
        inst->effSize = size;
        inst->effAddrValid(true);
-       inst->memData = coalescing_buffer.at(inst->physEffAddr & mask) +
-       (inst->physEffAddr & ~mask);
+       inst->memData = new uint8_t[size];
+       memcpy(inst->memData, coalescing_buffer.at(inst->physEffAddr & mask) +
+       (inst->physEffAddr & ~mask), size);
        inst->setMemAccPredicate(true);
+       Fault fault;
+       fault = cpu->read_coalescing(req, inst->lqIdx);
+       //PacketPtr data_pkt = new Packet(req->mainRequest(), MemCmd::ReadReq);
+       //data_pkt->dataStatic(inst->memData);
+       //WritebackEvent *wb = new WritebackEvent(inst, data_pkt, this);
+       //cpu->schedule(wb, curTick());
        inst->setExecuted();
     }
 

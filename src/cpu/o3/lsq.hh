@@ -1017,6 +1017,7 @@ class LSQ
      */
     Fault read(LSQRequest* req, int load_idx);
 
+    Fault read_coalescing(LSQRequest* req, int load_idx);
     /** Executes a store operation, using the store specified at the store
      * index.
      */
@@ -1130,6 +1131,16 @@ LSQ<Impl>::read(LSQRequest* req, int load_idx)
     ThreadID tid = cpu->contextToThread(req->request()->contextId());
 
     return thread.at(tid).read(req, load_idx);
+}
+
+
+template <class Impl>
+Fault
+LSQ<Impl>::read_coalescing(LSQRequest* req, int load_idx)
+{
+    ThreadID tid = cpu->contextToThread(req->request()->contextId());
+
+    return thread.at(tid).read_coalescing(req, load_idx);
 }
 
 template <class Impl>
