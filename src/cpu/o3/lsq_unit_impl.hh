@@ -588,6 +588,24 @@ LSQUnit<Impl>::executeLoad(const DynInstPtr &inst)
             auto it = inst->lqIt;
             ++it;
 
+            for (int i = 0; i < inst->effSize;i++)
+            {
+               DPRINTF(LSQUnit,":::: %#x\n",*(inst->memData + i));
+             }
+             uint64_t mask = ~((1 << 6) -1);
+             if (coalescing_buffer.find(inst->physEffAddr & mask)
+             != coalescing_buffer.end())
+             {
+
+              uint8_t *data = new uint8_t[inst->effSize];
+              memcpy(data, coalescing_buffer.at(inst->physEffAddr
+                & mask) + (inst->physEffAddr & ~mask), inst->effSize);
+               for (int i = 0; i < inst->effSize;i++)
+               {
+                  DPRINTF(LSQUnit,"Coalescing:::: %#x\n",*(data + i));
+               }
+                         }
+
             if (checkLoads)
                 return checkViolations(it, inst);
         }

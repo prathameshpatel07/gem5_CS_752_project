@@ -738,14 +738,15 @@ LSQ<Impl>::pushRequest(const DynInstPtr& inst, bool isLoad, uint8_t *data,
     uint64_t mask = ~((1 << 6) - 1);
     /*If data not found in coalescing buffer do the normal memory request*/
 
-    if ((inst->isLoad() && coalescing_buffer.find(inst->physEffAddr & mask)
+        if ((inst->isLoad() && coalescing_buffer.find(inst->physEffAddr & mask)
     == coalescing_buffer.end()) || !inst->isLoad()) {
        /* This is the place were instructions get the effAddr. */
-        if (inst->isStore()) {
-                if (coalescing_buffer.find(inst->physEffAddr & mask)
-                != coalescing_buffer.end())
-                        coalescing_buffer.erase(inst->physEffAddr & mask);
+         if (inst->isStore()) {
+            if (coalescing_buffer.find(inst->physEffAddr & mask)
+             != coalescing_buffer.end())
+                coalescing_buffer.erase(inst->physEffAddr & mask);
         }
+                DPRINTF(LSQUnit, "If condition\n");
         if (req->isTranslationComplete()) {
             if (req->isMemAccessRequired()) {
                 inst->effAddr = req->getVaddr();
@@ -775,6 +776,7 @@ LSQ<Impl>::pushRequest(const DynInstPtr& inst, bool isLoad, uint8_t *data,
        }
     }
     else {//Fetch data from coalescing buffer
+        DPRINTF(LSQUnit, "else condition\n");
         if (req->isTranslationComplete()) {
             if (req->isMemAccessRequired()) {
                 inst->effAddr = req->getVaddr();
@@ -786,11 +788,22 @@ LSQ<Impl>::pushRequest(const DynInstPtr& inst, bool isLoad, uint8_t *data,
                     std::make_shared<Request>(*req->request());
                 }
                 Fault fault;
-                inst->memData = new uint8_t[size];
-                memcpy(inst->memData, coalescing_buffer.at(inst->physEffAddr
-                & mask) + (inst->physEffAddr & ~mask), size);
+                                //if (!inst->memData)
+                                        //inst->memData = new uint8_t[size];
+                //memcpy(inst->memData, coalescing_buffer.at(inst->physEffAddr
+                //& mask) + (inst->physEffAddr & ~mask), size);
+
+                //DPRINTF(LSQUnit,":::: %#x\n",*(inst->memData));
+                                //for (int i = 0; i < size;i++)
+                                //{
+                 //	DPRINTF(LSQUnit,":::: %#x\n",*(inst->memData + i));
+                                //}
                 fault = cpu->read_coalescing(req, inst->lqIdx);
-                    inst->setExecuted();
+                                if (fault != NoFault)
+                    inst->getFault() = fault;
+               } else if (isLoad) {
+               inst->setMemAccPredicate(false);
+                inst->setExecuted();
                }
             }
        }
