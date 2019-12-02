@@ -782,25 +782,21 @@ LSQ<Impl>::pushRequest(const DynInstPtr& inst, bool isLoad, uint8_t *data,
                 inst->effAddr = req->getVaddr();
                 inst->effSize = size;
                 inst->effAddrValid(true);
-
                 if (cpu->checker) {
                     inst->reqToVerify =
                     std::make_shared<Request>(*req->request());
                 }
                 Fault fault;
-                                //if (!inst->memData)
-                                        //inst->memData = new uint8_t[size];
-                //memcpy(inst->memData, coalescing_buffer.at(inst->physEffAddr
-                //& mask) + (inst->physEffAddr & ~mask), size);
+                if (!inst->memData)
+                    inst->memData = new uint8_t[size];
+                memcpy(inst->memData, coalescing_buffer.at(inst->physEffAddr
+                & mask) + (inst->physEffAddr & ~mask), size);
 
-                //DPRINTF(LSQUnit,":::: %#x\n",*(inst->memData));
-                                //for (int i = 0; i < size;i++)
-                                //{
-                 //	DPRINTF(LSQUnit,":::: %#x\n",*(inst->memData + i));
-                                //}
+                 //for (int i = 0; i < size;i++)
+                 //{
+                   //DPRINTF(LSQUnit,"Actual:::: %#x\n",*(inst->memData + i));
+                 //}
                 fault = cpu->read_coalescing(req, inst->lqIdx);
-                                if (fault != NoFault)
-                    inst->getFault() = fault;
                } else if (isLoad) {
                inst->setMemAccPredicate(false);
                 inst->setExecuted();
@@ -813,15 +809,8 @@ LSQ<Impl>::pushRequest(const DynInstPtr& inst, bool isLoad, uint8_t *data,
        //inst->memData = new uint8_t[size];
        //memcpy(inst->memData, coalescing_buffer.at(inst->physEffAddr & mask) +
        //(inst->physEffAddr & ~mask), size);
-       //inst->setMemAccPredicate(false);
        //Fault fault;
        //fault = cpu->read(req, inst->lqIdx);
-
-       //PacketPtr data_pkt = new Packet(req->mainRequest(), MemCmd::ReadReq);
-       //data_pkt->dataStatic(inst->memData);
-       //WritebackEvent *wb = new WritebackEvent(inst, data_pkt, this);
-       //cpu->schedule(wb, curTick());
-       //inst->setExecuted();
 
     if (inst->traceData)
         inst->traceData->setMem(addr, size, flags);

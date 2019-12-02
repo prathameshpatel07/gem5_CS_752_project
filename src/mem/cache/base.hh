@@ -106,6 +106,7 @@ class BaseCache : public ClockedObject
     /**
      * Reasons for caches to be blocked.
      */
+    bool isDCache;
     enum BlockedCause {
         Blocked_NoMSHRs = MSHRQueue_MSHRs,
         Blocked_NoWBBuffers = MSHRQueue_WriteBuffer,

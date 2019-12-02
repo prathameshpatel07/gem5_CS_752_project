@@ -125,7 +125,10 @@ BaseCache::BaseCache(const BaseCacheParams *p, unsigned blk_size)
     // whether the connected master is actually snooping or not
 
     tempBlock = new TempCacheBlk(blkSize);
-
+    if (p->name.find("dcache") != string::npos)
+            isDCache = true;
+    else
+            isDCache = false;
     tags->tagsInit();
     if (prefetcher)
         prefetcher->setCache(this);
@@ -954,7 +957,7 @@ BaseCache::satisfyRequest(PacketPtr pkt, CacheBlk *blk, bool, bool)
         // all read responses have a data payload
         assert(pkt->hasRespData());
         //If read request from load copy the cache block to the buffer
-        if (pkt->cmd == MemCmd::ReadReq) {
+        if (pkt->cmd == MemCmd::ReadReq && isDCache) {
             uint8_t *d = (uint8_t *)malloc(64);
             memcpy(d, blk->data, 64);
             uint64_t mask = ~((1 << 6) - 1);

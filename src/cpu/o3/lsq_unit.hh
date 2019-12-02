@@ -613,13 +613,227 @@ template<class Impl>
 Fault
 LSQUnit<Impl>::read_coalescing(LSQRequest *req, int load_idx)
 {
+
+////////////////////////////////////////////////////
+///OLD
+////////////////////////////////////////////////////
+
+
+
+///////////////////////////////////////////////////////
     LQEntry& load_req = loadQueue[load_idx];
     const DynInstPtr& load_inst = load_req.instruction();
+
+    load_req.setRequest(req);
+    assert(load_inst);
+    assert(!load_inst->isExecuted());
+
+    // Make sure this isn't a strictly ordered load
+    // A bit of a hackish way to get strictly ordered accesses to work
+    // only if they're at the head of the LSQ and are ready to commit
+    // (at the head of the ROB too).
+
+    if (req->mainRequest()->isStrictlyOrdered() &&
+        (load_idx != loadQueue.head() || !load_inst->isAtCommit())) {
+        // Tell IQ/mem dep unit that this instruction will need to be
+        // rescheduled eventually
+        iewStage->rescheduleMemInst(load_inst);
+        load_inst->clearIssued();
+        load_inst->effAddrValid(false);
+        ++lsqRescheduledLoads;
+        DPRINTF(LSQUnit, "Strictly ordered load [sn:%lli] PC %s\n",
+                load_inst->seqNum, load_inst->pcState());
+
+        // Must delete request now that it wasn't handed off to
+        // memory.  This is quite ugly.  @todo: Figure out the proper
+        // place to really handle request deletes.
+        load_req.setRequest(nullptr);
+        req->discard();
+        return std::make_shared<GenericISA::M5PanicFault>(
+            "Strictly ordered load [sn:%llx] PC %s\n",
+            load_inst->seqNum, load_inst->pcState());
+    }
+
+    DPRINTF(LSQUnit, "Read called, load idx: %i, store idx: %i, "
+            "storeHead: %i addr: %#x%s\n",
+            load_idx - 1, load_inst->sqIt._idx, storeQueue.head() - 1,
+            req->mainRequest()->getPaddr(), req->isSplit() ? " split" : "");
+
+    if (req->mainRequest()->isLLSC()) {
+        // Disable recording the result temporarily.  Writing to misc
+        // regs normally updates the result, but this is not the
+        // desired behavior when handling store conditionals.
+        load_inst->recordResult(false);
+        TheISA::handleLockedRead(load_inst.get(), req->mainRequest());
+        load_inst->recordResult(true);
+    }
+
+    if (req->mainRequest()->isMmappedIpr()) {
+        assert(!load_inst->memData);
+        load_inst->memData = new uint8_t[MaxDataBytes];
+
+        ThreadContext *thread = cpu->tcBase(lsqID);
+        PacketPtr main_pkt = new Packet(req->mainRequest(), MemCmd::ReadReq);
+
+        main_pkt->dataStatic(load_inst->memData);
+
+        Cycles delay = req->handleIprRead(thread, main_pkt);
+
+        WritebackEvent *wb = new WritebackEvent(load_inst, main_pkt, this);
+        cpu->schedule(wb, cpu->clockEdge(delay));
+        return NoFault;
+    }
+
+    // Check the SQ for any previous stores that might lead to forwarding
+    auto store_it = load_inst->sqIt;
+    assert (store_it >= storeWBIt);
+    // End once we've reached the top of the LSQ
+    while (store_it != storeWBIt) {
+        // Move the index to one younger
+        store_it--;
+        assert(store_it->valid());
+        assert(store_it->instruction()->seqNum < load_inst->seqNum);
+        int store_size = store_it->size();
+
+        // Cache maintenance instructions go down via the store
+        // path but they carry no data and they shouldn't be
+        // considered for forwarding
+        if (store_size != 0 && !store_it->instruction()->strictlyOrdered() &&
+            !(store_it->request()->mainRequest() &&
+              store_it->request()->mainRequest()->isCacheMaintenance())) {
+            assert(store_it->instruction()->effAddrValid());
+
+            // Check if the store data is within the lower and upper bounds of
+            // addresses that the request needs.
+            auto req_s = req->mainRequest()->getVaddr();
+            auto req_e = req_s + req->mainRequest()->getSize();
+            auto st_s = store_it->instruction()->effAddr;
+            auto st_e = st_s + store_size;
+
+            bool store_has_lower_limit = req_s >= st_s;
+            bool store_has_upper_limit = req_e <= st_e;
+            bool lower_load_has_store_part = req_s < st_e;
+            bool upper_load_has_store_part = req_e > st_s;
+
+            // If the store entry is not atomic (atomic does not have valid
+            // data), the store has all of the data needed, and
+            // the load is not LLSC, then
+            // we can forward data from the store to the load
+            if (!store_it->instruction()->isAtomic() &&
+                store_has_lower_limit && store_has_upper_limit &&
+                !req->mainRequest()->isLLSC()) {
+
+                // Get shift amount for offset into the store's data.
+                int shift_amt = req->mainRequest()->getVaddr() -
+                    store_it->instruction()->effAddr;
+
+                // Allocate memory if this is the first time a load is issued.
+                if (!load_inst->memData) {
+                    load_inst->memData =
+                        new uint8_t[req->mainRequest()->getSize()];
+                }
+                if (store_it->isAllZeros())
+                    memset(load_inst->memData, 0,
+                            req->mainRequest()->getSize());
+                else
+                    memcpy(load_inst->memData,
+                        store_it->data() + shift_amt,
+                        req->mainRequest()->getSize());
+
+                DPRINTF(LSQUnit, "Forwarding from store idx %i to load to "
+                        "addr %#x\n", store_it._idx,
+                        req->mainRequest()->getVaddr());
+
+                PacketPtr data_pkt = new Packet(req->mainRequest(),
+                        MemCmd::ReadReq);
+                data_pkt->dataStatic(load_inst->memData);
+
+                if (req->isAnyOutstandingRequest()) {
+                    assert(req->_numOutstandingPackets > 0);
+                    // There are memory requests packets in flight already.
+                    // This may happen if the store was not complete the
+                    // first time this load got executed. Signal the senderSate
+                    // that response packets should be discarded.
+                    req->discardSenderState();
+                }
+
+                WritebackEvent *wb = new WritebackEvent(load_inst, data_pkt,
+                        this);
+                // We'll say this has a 1 cycle load-store forwarding latency
+                // for now.
+                // @todo: Need to make this a parameter.
+                cpu->schedule(wb, curTick());
+
+                // Don't need to do anything special for split loads.
+                ++lsqForwLoads;
+
+                return NoFault;
+            } else if (
+                // This is the partial store-load forwarding case where a store
+                // has only part of the load's data and the load isn't LLSC
+                (!req->mainRequest()->isLLSC() &&
+                 ((store_has_lower_limit && lower_load_has_store_part) ||
+                  (store_has_upper_limit && upper_load_has_store_part) ||
+                  (lower_load_has_store_part && upper_load_has_store_part))) ||
+                // The load is LLSC, and the store has all or part of the
+                // load's data
+                (req->mainRequest()->isLLSC() &&
+                 ((store_has_lower_limit || upper_load_has_store_part) &&
+                  (store_has_upper_limit || lower_load_has_store_part))) ||
+                // The store entry is atomic and has all or part of the load's
+                // data
+                (store_it->instruction()->isAtomic() &&
+                 ((store_has_lower_limit || upper_load_has_store_part) &&
+                  (store_has_upper_limit || lower_load_has_store_part)))) {
+
+                // If it's already been written back, then don't worry about
+                // stalling on it.
+                if (store_it->completed()) {
+                    panic("Should not check one of these");
+                    continue;
+                }
+
+                // Must stall load and force it to retry, so long as it's the
+                // oldest load that needs to do so.
+                if (!stalled ||
+                    (stalled &&
+                     load_inst->seqNum <
+                     loadQueue[stallingLoadIdx].instruction()->seqNum)) {
+                    stalled = true;
+                    stallingStoreIsn = store_it->instruction()->seqNum;
+                    stallingLoadIdx = load_idx;
+                }
+
+                // Tell IQ/mem dep unit that this instruction will need to be
+                // rescheduled eventually
+                iewStage->rescheduleMemInst(load_inst);
+                load_inst->clearIssued();
+                load_inst->effAddrValid(false);
+                ++lsqRescheduledLoads;
+
+                // Do not generate a writeback event as this instruction is not
+                // complete.
+                DPRINTF(LSQUnit, "Load-store forwarding mis-match. "
+                        "Store idx %i to load addr %#x\n",
+                        store_it._idx, req->mainRequest()->getVaddr());
+
+                // Must discard the request.
+                req->discard();
+                load_req.setRequest(nullptr);
+                return NoFault;
+            }
+        }
+    }
+
     PacketPtr data_pkt = new Packet(req->mainRequest(), MemCmd::ReadReq);
     data_pkt->dataStatic(load_inst->memData);
     WritebackEvent *wb = new WritebackEvent(load_inst, data_pkt, this);
     cpu->schedule(wb, curTick());
+
     return NoFault;
+
+////////////////////////////////////////////////////////
+
 }
 
 template <class Impl>

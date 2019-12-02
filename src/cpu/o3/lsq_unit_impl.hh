@@ -603,6 +603,8 @@ LSQUnit<Impl>::executeLoad(const DynInstPtr &inst)
                for (int i = 0; i < inst->effSize;i++)
                {
                   DPRINTF(LSQUnit,"Coalescing:::: %#x\n",*(data + i));
+                                  if (*(data + i) != *(inst->memData + i))
+                                          DPRINTF(LSQUnit, "Wrong Value");
                }
                          }
 
