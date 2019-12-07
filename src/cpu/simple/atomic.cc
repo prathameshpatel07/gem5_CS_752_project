@@ -435,6 +435,9 @@ AtomicSimpleCPU::readMem(Addr addr, uint8_t * data, unsigned size,
             if (req->isMmappedIpr()) {
                 dcache_latency += TheISA::handleIprRead(thread->getTC(), &pkt);
             } else {
+                //LRU Implementation by changing the Key Access List when used
+                keyaddr_list.remove(req->getPaddr() & mask);
+                keyaddr_list.push_back(req->getPaddr() & mask);
                 pkt.setDataFromBlock
                 (coalescing_buffer.at(req->getPaddr() & mask),64);
                 //dcache_latency += sendPacket(dcachePort, &pkt);
@@ -647,8 +650,10 @@ AtomicSimpleCPU::amoMem(Addr addr, uint8_t* data, unsigned size,
         else {
             uint64_t mask =~((1<<6) -1);
             if (coalescing_buffer.find(req->getPaddr() & mask)
-            != coalescing_buffer.end())
+            != coalescing_buffer.end()) {
+                keyaddr_list.remove(req->getPaddr() & mask);
                 coalescing_buffer.erase(req->getPaddr() & mask);
+            }
             dcache_latency += sendPacket(dcachePort, &pkt);
         }
 
