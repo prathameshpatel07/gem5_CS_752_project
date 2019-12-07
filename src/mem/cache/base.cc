@@ -958,8 +958,8 @@ BaseCache::satisfyRequest(PacketPtr pkt, CacheBlk *blk, bool, bool)
         // all read responses have a data payload
         assert(pkt->hasRespData());
         //If read request from load copy the cache block to the buffer
-        if (pkt->cmd == MemCmd::ReadReq && isDCache
-        && coalescing_buffer.size() <= SIZE) {
+        if (pkt->cmd == MemCmd::ReadReq && isDCache) {
+        //&& coalescing_buffer.size() <= SIZE) { //Check for size
             uint8_t *d = (uint8_t *)malloc(64);
             memcpy(d, blk->data, 64);
             uint64_t mask = ~((1 << 6) - 1);
