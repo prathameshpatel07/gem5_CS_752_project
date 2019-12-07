@@ -959,11 +959,21 @@ BaseCache::satisfyRequest(PacketPtr pkt, CacheBlk *blk, bool, bool)
         assert(pkt->hasRespData());
         //If read request from load copy the cache block to the buffer
         if (pkt->cmd == MemCmd::ReadReq && isDCache) {
-        //&& coalescing_buffer.size() <= SIZE) { //Check for size
+//        && coalescing_buffer.size() <= SIZE) { //Check for size
             uint8_t *d = (uint8_t *)malloc(64);
             memcpy(d, blk->data, 64);
             uint64_t mask = ~((1 << 6) - 1);
-            coalescing_buffer[(pkt->getAddr() & mask)] = d;
+            if (coalescing_buffer.size() < SIZE)
+                coalescing_buffer[(pkt->getAddr() & mask)] = d;
+            else { //Eviction
+                   // Policy: FIFO
+                auto it = coalescing_buffer.begin();
+                if (coalescing_buffer.size() > SIZE)
+                        printf("Error: Coalescing Buffer Size exceeded\n");
+
+                coalescing_buffer.erase(it);
+                coalescing_buffer[(pkt->getAddr() & mask)] = d;
+            }
         }
         pkt->setDataFromBlock(blk->data, blkSize);
     } else if (pkt->isUpgrade()) {
