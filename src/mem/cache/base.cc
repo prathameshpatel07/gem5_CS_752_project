@@ -52,7 +52,8 @@
 
 #include "base/compiler.hh"
 #include "base/logging.hh"
-#include "cpu/o3/lsq.hh"
+//#include "cpu/o3/lsq.hh"   //Include for O3 CPU
+#include "cpu/simple/atomic.hh"  //Include for AtomicSimpleCPU
 #include "debug/Cache.hh"
 #include "debug/CacheComp.hh"
 #include "debug/CachePort.hh"

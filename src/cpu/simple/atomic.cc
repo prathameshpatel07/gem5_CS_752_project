@@ -395,7 +395,6 @@ AtomicSimpleCPU::readMem(Addr addr, uint8_t * data, unsigned size,
     while (1) {
         predicate = genMemFragmentRequest(req, frag_addr, size, flags,
                                           byteEnable, frag_size, size_left);
-
         // translate to physical address
         if (predicate) {
             fault = thread->dtb->translateAtomic(req, thread->getTC(),
@@ -403,6 +402,10 @@ AtomicSimpleCPU::readMem(Addr addr, uint8_t * data, unsigned size,
         }
 
         // Now do the access.
+        uint64_t mask = ~((1 << 6) - 1);
+        if (coalescing_buffer.find(req->getPaddr() & mask)
+        == coalescing_buffer.end())
+        {
         if (predicate && fault == NoFault &&
             !req->getFlags().isSet(Request::NO_ACCESS)) {
             Packet pkt(req, Packet::makeReadCmd(req));
@@ -420,6 +423,30 @@ AtomicSimpleCPU::readMem(Addr addr, uint8_t * data, unsigned size,
             if (req->isLLSC()) {
                 TheISA::handleLockedRead(thread, req);
             }
+        }
+        }
+        else
+        {
+        if (predicate && fault == NoFault &&
+            !req->getFlags().isSet(Request::NO_ACCESS)) {
+            Packet pkt(req, Packet::makeReadCmd(req));
+            pkt.dataStatic(data);
+
+            if (req->isMmappedIpr()) {
+                dcache_latency += TheISA::handleIprRead(thread->getTC(), &pkt);
+            } else {
+                pkt.setDataFromBlock
+                (coalescing_buffer.at(req->getPaddr() & mask),64);
+                //dcache_latency += sendPacket(dcachePort, &pkt);
+            }
+            dcache_access = true;
+
+            assert(!pkt.isError());
+
+            if (req->isLLSC()) {
+                TheISA::handleLockedRead(thread, req);
+            }
+        }
         }
 
         //If there's a fault, return it
@@ -517,6 +544,10 @@ AtomicSimpleCPU::writeMem(uint8_t *data, unsigned size, Addr addr,
                     dcache_latency +=
                         TheISA::handleIprWrite(thread->getTC(), &pkt);
                 } else {
+                    uint64_t mask = ~((1<<6) - 1);
+                    if (coalescing_buffer.find(req->getPaddr() & mask)
+                    != coalescing_buffer.end())
+                           coalescing_buffer.erase(req->getPaddr() & mask);
                     dcache_latency += sendPacket(dcachePort, &pkt);
 
                     // Notify other threads on this CPU of write
@@ -612,6 +643,10 @@ AtomicSimpleCPU::amoMem(Addr addr, uint8_t* data, unsigned size,
         if (req->isMmappedIpr())
             dcache_latency += TheISA::handleIprRead(thread->getTC(), &pkt);
         else {
+            uint64_t mask =~((1<<6) -1);
+            if (coalescing_buffer.find(req->getPaddr() & mask)
+            != coalescing_buffer.end())
+                coalescing_buffer.erase(req->getPaddr() & mask);
             dcache_latency += sendPacket(dcachePort, &pkt);
         }
 

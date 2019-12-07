@@ -42,12 +42,15 @@
 
 #ifndef __CPU_SIMPLE_ATOMIC_HH__
 #define __CPU_SIMPLE_ATOMIC_HH__
+#include <map>
 
 #include "cpu/simple/base.hh"
 #include "cpu/simple/exec_context.hh"
 #include "mem/request.hh"
 #include "params/AtomicSimpleCPU.hh"
 #include "sim/probe/probe.hh"
+
+extern std::map <Addr, uint8_t *>coalescing_buffer;
 
 class AtomicSimpleCPU : public BaseSimpleCPU
 {
