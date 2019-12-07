@@ -48,10 +48,13 @@
 
 #include "mem/cache/base.hh"
 
+#include <iterator>
+#include <list>
 #include <map>
 
 #include "base/compiler.hh"
 #include "base/logging.hh"
+
 //#include "cpu/o3/lsq.hh"   //Include for O3 CPU
 #include "cpu/simple/atomic.hh"  //Include for AtomicSimpleCPU
 #include "debug/Cache.hh"
@@ -71,6 +74,7 @@
 using namespace std;
 #define SIZE 16 //Size of coalescing buffer
 map<Addr, uint8_t *> coalescing_buffer;
+list<Addr> keyaddr_list;
 
 BaseCache::CacheSlavePort::CacheSlavePort(const std::string &_name,
                                           BaseCache *_cache,
@@ -963,15 +967,19 @@ BaseCache::satisfyRequest(PacketPtr pkt, CacheBlk *blk, bool, bool)
             uint8_t *d = (uint8_t *)malloc(64);
             memcpy(d, blk->data, 64);
             uint64_t mask = ~((1 << 6) - 1);
-            if (coalescing_buffer.size() < SIZE)
+            if (coalescing_buffer.size() < SIZE) {
+                keyaddr_list.push_back((pkt->getAddr() & mask));
                 coalescing_buffer[(pkt->getAddr() & mask)] = d;
+            }
             else { //Eviction
                    // Policy: FIFO
-                auto it = coalescing_buffer.begin();
                 if (coalescing_buffer.size() > SIZE)
                         printf("Error: Coalescing Buffer Size exceeded\n");
 
-                coalescing_buffer.erase(it);
+                auto rmaddr = keyaddr_list.front();
+                coalescing_buffer.erase(rmaddr);
+                keyaddr_list.pop_front();
+                keyaddr_list.push_back((pkt->getAddr() & mask));
                 coalescing_buffer[(pkt->getAddr() & mask)] = d;
             }
         }

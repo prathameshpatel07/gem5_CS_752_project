@@ -42,6 +42,7 @@
 
 #ifndef __CPU_SIMPLE_ATOMIC_HH__
 #define __CPU_SIMPLE_ATOMIC_HH__
+#include <list>
 #include <map>
 
 #include "cpu/simple/base.hh"
@@ -51,6 +52,8 @@
 #include "sim/probe/probe.hh"
 
 extern std::map <Addr, uint8_t *>coalescing_buffer;
+extern std::list <Addr> keyaddr_list;
+
 
 class AtomicSimpleCPU : public BaseSimpleCPU
 {

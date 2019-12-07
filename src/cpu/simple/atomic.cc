@@ -546,8 +546,10 @@ AtomicSimpleCPU::writeMem(uint8_t *data, unsigned size, Addr addr,
                 } else {
                     uint64_t mask = ~((1<<6) - 1);
                     if (coalescing_buffer.find(req->getPaddr() & mask)
-                    != coalescing_buffer.end())
+                    != coalescing_buffer.end()) {
+                           keyaddr_list.remove(req->getPaddr() & mask);
                            coalescing_buffer.erase(req->getPaddr() & mask);
+                    }
                     dcache_latency += sendPacket(dcachePort, &pkt);
 
                     // Notify other threads on this CPU of write
