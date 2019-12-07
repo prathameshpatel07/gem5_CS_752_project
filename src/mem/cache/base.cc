@@ -55,8 +55,17 @@
 #include "base/compiler.hh"
 #include "base/logging.hh"
 
+//Coalescing Definitions - Prathamesh
+#define ATOMIC
+#ifdef ATOMIC
 //#include "cpu/o3/lsq.hh"   //Include for O3 CPU
 #include "cpu/simple/atomic.hh"  //Include for AtomicSimpleCPU
+
+#else
+#include "cpu/o3/lsq.hh"   //Include for O3 CPU
+
+#endif
+
 #include "debug/Cache.hh"
 #include "debug/CacheComp.hh"
 #include "debug/CachePort.hh"
@@ -72,9 +81,11 @@
 #include "sim/core.hh"
 
 using namespace std;
+#ifdef ATOMIC
 #define SIZE 16 //Size of coalescing buffer
-map<Addr, uint8_t *> coalescing_buffer;
 list<Addr> keyaddr_list;
+#endif
+map<Addr, uint8_t *> coalescing_buffer;
 
 BaseCache::CacheSlavePort::CacheSlavePort(const std::string &_name,
                                           BaseCache *_cache,
@@ -967,6 +978,7 @@ BaseCache::satisfyRequest(PacketPtr pkt, CacheBlk *blk, bool, bool)
             uint8_t *d = (uint8_t *)malloc(64);
             memcpy(d, blk->data, 64);
             uint64_t mask = ~((1 << 6) - 1);
+#ifdef ATOMIC
             if (coalescing_buffer.size() < SIZE) {
                 keyaddr_list.push_back((pkt->getAddr() & mask));
                 coalescing_buffer[(pkt->getAddr() & mask)] = d;
@@ -982,6 +994,9 @@ BaseCache::satisfyRequest(PacketPtr pkt, CacheBlk *blk, bool, bool)
                 keyaddr_list.push_back((pkt->getAddr() & mask));
                 coalescing_buffer[(pkt->getAddr() & mask)] = d;
             }
+#else
+                coalescing_buffer[(pkt->getAddr() & mask)] = d;
+#endif
         }
         pkt->setDataFromBlock(blk->data, blkSize);
     } else if (pkt->isUpgrade()) {
