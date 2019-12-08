@@ -81,8 +81,8 @@ using namespace std;
 #ifdef ATOMIC
 #define SIZE 16 //Size of coalescing buffer
 list<Addr> keyaddr_list;
-//Possible Eviction policies = "FIFO, LRU, NMRU, Random
-string eviction_policy = "NMRU";
+//Possible Eviction policies = FIFO, LRU, NMRU, Random
+string eviction_policy = "Random";
 #endif
 map<Addr, uint8_t *> coalescing_buffer;
 
@@ -972,19 +972,16 @@ BaseCache::satisfyRequest(PacketPtr pkt, CacheBlk *blk, bool, bool)
         // all read responses have a data payload
         assert(pkt->hasRespData());
         //If read request from load copy the cache block to the buffer
-        if (pkt->cmd == MemCmd::ReadReq && isDCache
-        && coalescing_buffer.size() <= SIZE) { //Check for size
+        if (pkt->cmd == MemCmd::ReadReq && isDCache) {
             uint8_t *d = (uint8_t *)malloc(64);
             memcpy(d, blk->data, 64);
             uint64_t mask = ~((1 << 6) - 1);
-            keyaddr_list.push_back((pkt->getAddr() & mask));
-            coalescing_buffer[(pkt->getAddr() & mask)] = d;
+            if (coalescing_buffer.size() < SIZE) {
+              keyaddr_list.push_back((pkt->getAddr() & mask));
+              coalescing_buffer[(pkt->getAddr() & mask)] = d;
             }
             else { //Eviction
                    // Policy: FIFO
-                uint8_t *d = (uint8_t *)malloc(64);
-                memcpy(d, blk->data, 64);
-                uint64_t mask = ~((1 << 6) - 1);
                 //If FIFO or LRU eviction policy remove the 1st element
                 if (eviction_policy == "FIFO" || eviction_policy == "LRU") {
                   auto rmaddr = keyaddr_list.front();
@@ -1008,7 +1005,7 @@ BaseCache::satisfyRequest(PacketPtr pkt, CacheBlk *blk, bool, bool)
                 keyaddr_list.push_back((pkt->getAddr() & mask));
                 coalescing_buffer[(pkt->getAddr() & mask)] = d;
             }
-        }
+         }
         pkt->setDataFromBlock(blk->data, blkSize);
     } else if (pkt->isUpgrade()) {
         // sanity check
