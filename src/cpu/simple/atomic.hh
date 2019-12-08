@@ -44,6 +44,7 @@
 #define __CPU_SIMPLE_ATOMIC_HH__
 #include <list>
 #include <map>
+#include <string>
 
 #include "cpu/simple/base.hh"
 #include "cpu/simple/exec_context.hh"
@@ -53,6 +54,7 @@
 
 extern std::map <Addr, uint8_t *>coalescing_buffer;
 extern std::list <Addr> keyaddr_list;
+extern std::string eviction_policy;
 
 
 class AtomicSimpleCPU : public BaseSimpleCPU

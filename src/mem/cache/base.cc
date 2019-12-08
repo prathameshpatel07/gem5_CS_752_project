@@ -55,15 +55,12 @@
 #include "base/compiler.hh"
 #include "base/logging.hh"
 
-//Coalescing Definitions - Prathamesh
 #define ATOMIC
 #ifdef ATOMIC
-//#include "cpu/o3/lsq.hh"   //Include for O3 CPU
 #include "cpu/simple/atomic.hh"  //Include for AtomicSimpleCPU
 
 #else
 #include "cpu/o3/lsq.hh"   //Include for O3 CPU
-
 #endif
 
 #include "debug/Cache.hh"
@@ -84,6 +81,8 @@ using namespace std;
 #ifdef ATOMIC
 #define SIZE 16 //Size of coalescing buffer
 list<Addr> keyaddr_list;
+//Possible Eviction policies = "FIFO, LRU, NMRU, Random
+string eviction_policy = "NMRU";
 #endif
 map<Addr, uint8_t *> coalescing_buffer;
 
@@ -973,30 +972,42 @@ BaseCache::satisfyRequest(PacketPtr pkt, CacheBlk *blk, bool, bool)
         // all read responses have a data payload
         assert(pkt->hasRespData());
         //If read request from load copy the cache block to the buffer
-        if (pkt->cmd == MemCmd::ReadReq && isDCache) {
-//        && coalescing_buffer.size() <= SIZE) { //Check for size
+        if (pkt->cmd == MemCmd::ReadReq && isDCache
+        && coalescing_buffer.size() <= SIZE) { //Check for size
             uint8_t *d = (uint8_t *)malloc(64);
             memcpy(d, blk->data, 64);
             uint64_t mask = ~((1 << 6) - 1);
-#ifdef ATOMIC
-            if (coalescing_buffer.size() < SIZE) {
-                keyaddr_list.push_back((pkt->getAddr() & mask));
-                coalescing_buffer[(pkt->getAddr() & mask)] = d;
+            keyaddr_list.push_back((pkt->getAddr() & mask));
+            coalescing_buffer[(pkt->getAddr() & mask)] = d;
             }
             else { //Eviction
                    // Policy: FIFO
-                if (coalescing_buffer.size() > SIZE)
-                        printf("Error: Coalescing Buffer Size exceeded\n");
-
-                auto rmaddr = keyaddr_list.front();
-                coalescing_buffer.erase(rmaddr);
-                keyaddr_list.pop_front();
+                uint8_t *d = (uint8_t *)malloc(64);
+                memcpy(d, blk->data, 64);
+                uint64_t mask = ~((1 << 6) - 1);
+                //If FIFO or LRU eviction policy remove the 1st element
+                if (eviction_policy == "FIFO" || eviction_policy == "LRU") {
+                  auto rmaddr = keyaddr_list.front();
+                  coalescing_buffer.erase(rmaddr);
+                  keyaddr_list.pop_front();
+                }
+                else if (eviction_policy == "Random") {
+                  auto random_index = rand() % SIZE;
+                  auto it = keyaddr_list.begin();
+                  advance(it, random_index);
+                  keyaddr_list.erase(it);
+                  coalescing_buffer.erase(*it);
+                }
+                else {//eviction policy is NMRU( random without last element)
+                  auto random_index = rand() % (SIZE - 1);
+                  auto it = keyaddr_list.begin();
+                  advance(it, random_index);
+                  keyaddr_list.erase(it);
+                  coalescing_buffer.erase(*it);
+                }
                 keyaddr_list.push_back((pkt->getAddr() & mask));
                 coalescing_buffer[(pkt->getAddr() & mask)] = d;
             }
-#else
-                coalescing_buffer[(pkt->getAddr() & mask)] = d;
-#endif
         }
         pkt->setDataFromBlock(blk->data, blkSize);
     } else if (pkt->isUpgrade()) {
