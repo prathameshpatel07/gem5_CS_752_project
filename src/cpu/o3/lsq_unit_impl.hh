@@ -590,7 +590,7 @@ LSQUnit<Impl>::executeLoad(const DynInstPtr &inst)
 
             for (int i = 0; i < inst->effSize;i++)
             {
-               DPRINTF(LSQUnit,":::: %#x\n",*(inst->memData + i));
+               DPRINTF(LSQUnit,"Actual:::: %#x\n",*(inst->memData + i));
              }
              uint64_t mask = ~((1 << 6) -1);
              if (coalescing_buffer.find(inst->physEffAddr & mask)
@@ -675,6 +675,7 @@ LSQUnit<Impl>::commitLoad()
 {
     assert(loadQueue.front().valid());
 
+    coalescing_buffer.clear();
     DPRINTF(LSQUnit, "Committing head load instruction, PC %s\n",
             loadQueue.front().instruction()->pcState());
 
@@ -1045,7 +1046,6 @@ LSQUnit<Impl>::completeStore(typename StoreQueue::iterator store_idx)
             curTick() - store_inst->fetchTick;
     }
 #endif
-
     if (isStalled() &&
         store_inst->seqNum == stallingStoreIsn) {
         DPRINTF(LSQUnit, "Unstalling, stalling store [sn:%lli] "

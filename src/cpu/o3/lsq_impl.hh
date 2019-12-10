@@ -60,7 +60,6 @@
 #include "params/DerivO3CPU.hh"
 
 using namespace std;
-
 template <class Impl>
 LSQ<Impl>::LSQ(O3CPU *cpu_ptr, IEW *iew_ptr, DerivO3CPUParams *params)
     : cpu(cpu_ptr), iewStage(iew_ptr),
@@ -744,7 +743,8 @@ LSQ<Impl>::pushRequest(const DynInstPtr& inst, bool isLoad, uint8_t *data,
          if (inst->isStore()) {
             if (coalescing_buffer.find(inst->physEffAddr & mask)
              != coalescing_buffer.end())
-                coalescing_buffer.erase(inst->physEffAddr & mask);
+                //coalescing_buffer.erase(inst->physEffAddr & mask);
+                coalescing_buffer.clear();
         }
                 DPRINTF(LSQUnit, "If condition\n");
         if (req->isTranslationComplete()) {
@@ -774,6 +774,8 @@ LSQ<Impl>::pushRequest(const DynInstPtr& inst, bool isLoad, uint8_t *data,
                 inst->setExecuted();
             }
        }
+
+     DPRINTF(LSQUnit, "Fetching from memory address = %#x\n",inst->effAddr);
     }
     else {//Fetch data from coalescing buffer
         DPRINTF(LSQUnit, "else condition\n");
@@ -789,13 +791,17 @@ LSQ<Impl>::pushRequest(const DynInstPtr& inst, bool isLoad, uint8_t *data,
                 Fault fault;
                 if (!inst->memData)
                     inst->memData = new uint8_t[size];
+                if (eviction_policy == "LRU" || eviction_policy == "NMRU") {
+                  keyaddr_list.remove(inst->physEffAddr & mask);
+                  keyaddr_list.push_back(inst->physEffAddr & mask);
+                }
                 memcpy(inst->memData, coalescing_buffer.at(inst->physEffAddr
                 & mask) + (inst->physEffAddr & ~mask), size);
 
-                 //for (int i = 0; i < size;i++)
-                 //{
-                   //DPRINTF(LSQUnit,"Actual:::: %#x\n",*(inst->memData + i));
-                 //}
+                 for (int i = 0; i < size;i++)
+                 {
+                   DPRINTF(LSQUnit,"Coal:::: %#x\n",*(inst->memData + i));
+                 }
                 fault = cpu->read_coalescing(req, inst->lqIdx);
                } else if (isLoad) {
                inst->setMemAccPredicate(false);

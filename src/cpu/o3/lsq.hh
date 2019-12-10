@@ -46,6 +46,7 @@
 
 #include <map>
 #include <queue>
+#include <string>
 
 #include "arch/generic/tlb.hh"
 #include "cpu/inst_seq.hh"
@@ -57,6 +58,10 @@
 
 struct DerivO3CPUParams;
 extern std::map <Addr, uint8_t *> coalescing_buffer;
+extern std::list <Addr> keyaddr_list;
+extern std::string eviction_policy;
+//extern std::map <Impl::DynInstPtr, uint8_t *>instruction_to_cache_block;
+//extern std::map <Impl::DynInstPtr, bool> instruction_to_coalescing_buffer;
 
 template <class Impl>
 class FullO3CPU;

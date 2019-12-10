@@ -55,7 +55,7 @@
 #include "base/compiler.hh"
 #include "base/logging.hh"
 
-#define ATOMIC
+#define O3
 #ifdef ATOMIC
 #include "cpu/simple/atomic.hh"  //Include for AtomicSimpleCPU
 
@@ -78,12 +78,10 @@
 #include "sim/core.hh"
 
 using namespace std;
-#ifdef ATOMIC
 #define SIZE 16 //Size of coalescing buffer
 list<Addr> keyaddr_list;
 //Possible Eviction policies = FIFO, LRU, NMRU, Random
 string eviction_policy = "Random";
-#endif
 map<Addr, uint8_t *> coalescing_buffer;
 
 BaseCache::CacheSlavePort::CacheSlavePort(const std::string &_name,
